@@ -1,46 +1,155 @@
-# Getting Started with Create React App
+# react-docker-kubernetes
+Sample React app deployed as a docker container image to minikube for tutorial purposes
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Deploying a React application in Docker to Kubernetes can be a multi-step process, especially for beginners. Here's a step-by-step tutorial that covers everything from setting up the development environment to deploying to a local Kubernetes cluster on Windows. We'll assume you're starting from scratch and provide instructions for each step.
 
-## Available Scripts
+**Prerequisites:**
 
-In the project directory, you can run:
+1. **Windows OS**: Make sure you are using Windows as your operating system.
 
-### `npm start`
+2. **Docker**: Install Docker for Windows. You can download it from [Docker's official website](https://docs.docker.com/get-docker/). Make sure Docker Desktop is running by running the docker desktop app or open cmd and run docker info.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+3. **Kubernetes**: Install Minikube, which is a tool for running a single-node Kubernetes cluster. You can download it from the [Minikube GitHub repository](https://github.com/kubernetes/minikube/releases).
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+4. **kubectl**: Install `kubectl`, the Kubernetes command-line tool. You can use `choco` for package management on Windows or download it from the official Kubernetes release page (https://kubernetes.io/docs/tasks/tools/install-kubectl/).
 
-### `npm test`
+5. **Node.js and npm**: Ensure you have Node.js and npm installed. You can download and install them from the [official website](https://nodejs.org/).
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+6. **React**: You'll need a React application to deploy. If you don't have one, create a simple React app using Create React App. Install it globally with `npm install -g create-react-app` and create an app with `npx create-react-app my-react-app`.
 
-### `npm run build`
+Now that you have the prerequisites, let's move on to deploying the React application to Kubernetes.
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+**Step 1: Build a Docker Image**
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+1. Open a terminal and navigate to your React app's root directory.
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+2. Create a Dockerfile in your project root. You can use a text editor or run the following command: `touch Dockerfile`.
 
-### `npm run eject`
+3. Open the Dockerfile in your text editor and add the following content:
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+   ```Dockerfile
+   # Use an official Node runtime as a parent image
+   FROM node:14
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+   # Set the working directory in the container
+   WORKDIR /app
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+   # Copy package.json and package-lock.json to the working directory
+   COPY package*.json ./
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+   # Install app dependencies
+   RUN npm install
 
-## Learn More
+   # Bundle app source
+   COPY . .
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+   # Build your React app
+   RUN npm run build
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+   # Expose a port to listen to the app
+   EXPOSE 3000
+
+   # Start the application
+   CMD ["npm", "start"]
+   ```
+
+4. Save and close the Dockerfile.
+
+5. Build the Docker image from the project's root directory using this command:
+
+   ```
+   docker build -t my-react-app .
+   ```
+
+**Step 2: Run the Docker Container Locally**
+
+1. Once the Docker image is built successfully, you can run the container:
+
+   ```
+   docker run -p 3000:3000 my-react-app
+   ```
+
+   This command starts the React app in a Docker container and maps port 3000 on your laptop to port 3000 in the container.
+
+2. Open your web browser and visit `http://localhost:3000` to see your React app running in the Docker container.
+
+**Step 3: Setting up Kubernetes with Minikube**
+
+1. Initialize Minikube by running the following command:
+
+   ```
+   minikube start
+   ```
+
+2. To confirm that Minikube is running, use the following command:
+
+   ```
+   kubectl cluster-info
+   ```
+
+   You should see the Kubernetes master and DNS endpoint information.
+
+**Step 4: Deploy Your React App to Kubernetes**
+
+1. Create a Kubernetes deployment YAML file, e.g., `react-app-deployment.yaml`. Open it in a text editor and add the following content:
+
+   ```yaml
+   apiVersion: apps/v1
+   kind: Deployment
+   metadata:
+     name: react-app-deployment
+   spec:
+     replicas: 3
+     selector:
+       matchLabels:
+         app: react-app
+     template:
+       metadata:
+         labels:
+           app: react-app
+       spec:
+         containers:
+         - name: react-app-container
+           image: my-react-app
+           ports:
+           - containerPort: 3000
+   ```
+
+2. Apply the deployment to your Minikube cluster:
+
+   ```
+   kubectl apply -f react-app-deployment.yaml
+   ```
+
+3. Expose your React app to an external IP using a Kubernetes Service. Create a `react-app-service.yaml` file with the following content:
+
+   ```yaml
+   apiVersion: v1
+   kind: Service
+   metadata:
+     name: react-app-service
+   spec:
+     selector:
+       app: react-app
+     ports:
+     - protocol: TCP
+       port: 80
+       targetPort: 3000
+     type: LoadBalancer
+   ```
+
+4. Apply the service to your Minikube cluster:
+
+   ```
+   kubectl apply -f react-app-service.yaml
+   ```
+
+5. Find the external IP address for your React app:
+
+   ```
+   minikube service react-app-service
+   ```
+
+   Your React app should be accessible at the provided IP address.
+
+Congratulations! You've successfully deployed a React application in a Docker container to a local Kubernetes cluster on Windows. This tutorial covers all the necessary steps for a beginner to get started with this process.
